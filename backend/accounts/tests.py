@@ -98,3 +98,20 @@ class AuthenticationTests(APITestCase):
             status.HTTP_401_UNAUTHORIZED,
             response.data,
         )
+
+    def test_registration_without_password(self):
+        """Test that registration fails when password is missing."""
+        response = self.client.post(
+            reverse("accounts:register"),
+            {
+                "username": "nopassworduser",
+                "email": "nopassword@example.com",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+            response.data,
+        )

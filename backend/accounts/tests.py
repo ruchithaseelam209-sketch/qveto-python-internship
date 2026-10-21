@@ -9,7 +9,7 @@ User = get_user_model()
 class AuthenticationTests(APITestCase):
 
     def test_register_employee(self):
-        """Test that a new employee can register."""
+        """Test successful employee registration."""
         response = self.client.post(
             reverse("accounts:register"),
             {
@@ -100,7 +100,7 @@ class AuthenticationTests(APITestCase):
         )
 
     def test_registration_without_password(self):
-        """Test that registration fails when password is missing."""
+        """Test registration without a password."""
         response = self.client.post(
             reverse("accounts:register"),
             {
@@ -113,5 +113,46 @@ class AuthenticationTests(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_400_BAD_REQUEST,
+            response.data,
+        )
+
+    def test_login_without_password(self):
+        """Test login without a password."""
+        response = self.client.post(
+            reverse("accounts:login"),
+            {
+                "username": "loginuser",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+            response.data,
+        )
+
+    def test_login_with_inactive_account(self):
+        """Test that inactive accounts cannot log in."""
+        user = User.objects.create_user(
+            username="inactiveuser",
+            email="inactive@example.com",
+            password="SecurePass123!",
+        )
+        user.is_active = False
+        user.save()
+
+        response = self.client.post(
+            reverse("accounts:login"),
+            {
+                "username": "inactiveuser",
+                "password": "SecurePass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_401_UNAUTHORIZED,
             response.data,
         )

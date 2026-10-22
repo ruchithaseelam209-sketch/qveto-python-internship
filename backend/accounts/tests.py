@@ -156,3 +156,46 @@ class AuthenticationTests(APITestCase):
             status.HTTP_401_UNAUTHORIZED,
             response.data,
         )
+
+    def test_public_registration_creates_employee_role(self):
+        """Test that public registration creates an employee account."""
+        response = self.client.post(
+            reverse("accounts:register"),
+            {
+                "username": "roleemployee",
+                "email": "roleemployee@example.com",
+                "password": "SecurePass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+            response.data,
+        )
+
+        user = User.objects.get(username="roleemployee")
+        self.assertEqual(user.role, User.Role.EMPLOYEE)
+
+    def test_public_registration_cannot_assign_admin_role(self):
+        """Test that public registration cannot assign the admin role."""
+        response = self.client.post(
+            reverse("accounts:register"),
+            {
+                "username": "publicadmin",
+                "email": "publicadmin@example.com",
+                "password": "SecurePass123!",
+                "role": "ADMIN",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+            response.data,
+        )
+
+        user = User.objects.get(username="publicadmin")
+        self.assertEqual(user.role, User.Role.EMPLOYEE)

@@ -1,3 +1,4 @@
+
 """
 Django settings for Smart HR & Employee Management System.
 """
@@ -45,6 +46,7 @@ INSTALLED_APPS = [
 
     # Project applications
     "accounts",
+    "employees",
 ]
 
 
@@ -119,8 +121,7 @@ DATABASES = {
 # CUSTOM USER MODEL
 # =========================================================
 
-# We will create this model in accounts/models.py next.
-# Configure this before the first database migration.
+# Use the existing custom User model in the accounts app.
 AUTH_USER_MODEL = "accounts.User"
 
 

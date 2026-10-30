@@ -106,6 +106,7 @@ class EmployeeAPIPermissionTests(APITestCase):
 
         self.department_url = reverse("department-list")
         self.profile_list_url = reverse("employee-list")
+
         self.profile1_url = reverse(
             "employee-detail",
             args=[self.profile1.pk],
@@ -161,6 +162,20 @@ class EmployeeAPIPermissionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 2)
 
+    def test_superuser_can_access_all_profiles(self):
+        superuser = User.objects.create_superuser(
+            username="superadmin",
+            email="superadmin@example.com",
+            password="TestPassword123!",
+        )
+
+        self.client.force_authenticate(user=superuser)
+
+        response = self.client.get(self.profile_list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 2)
+
     def test_employee_can_only_list_own_profile(self):
         self.client.force_authenticate(user=self.employee1)
 
@@ -202,6 +217,27 @@ class EmployeeAPIPermissionTests(APITestCase):
             ],
         )
 
+    def test_admin_can_create_employee_profile(self):
+        self.client.force_authenticate(user=self.admin)
+
+        new_user = self.create_user("newemployee", "EMPLOYEE")
+
+        response = self.client.post(
+            self.profile_list_url,
+            {
+                "user_id": new_user.pk,
+                "department_id": self.department.pk,
+                "job_title": "Intern",
+                "status": "ACTIVE",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
     def test_employee_cannot_delete_own_profile(self):
         self.client.force_authenticate(user=self.employee1)
 
@@ -211,6 +247,7 @@ class EmployeeAPIPermissionTests(APITestCase):
             response.status_code,
             status.HTTP_403_FORBIDDEN,
         )
+
         self.assertTrue(
             EmployeeProfile.objects.filter(pk=self.profile1.pk).exists()
         )
@@ -227,6 +264,7 @@ class EmployeeAPIPermissionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.profile1.refresh_from_db()
+
         self.assertEqual(
             self.profile1.job_title,
             "Senior Developer",
@@ -244,6 +282,7 @@ class EmployeeAPIPermissionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.profile1.refresh_from_db()
+
         self.assertEqual(
             self.profile1.job_title,
             "Senior Developer",
@@ -267,6 +306,7 @@ class EmployeeAPIPermissionTests(APITestCase):
         )
 
         self.profile1.refresh_from_db()
+
         self.assertEqual(
             self.profile1.user_id,
             self.employee1.pk,
@@ -284,4 +324,92 @@ class EmployeeAPIPermissionTests(APITestCase):
         self.assertEqual(
             response.status_code,
             status.HTTP_403_FORBIDDEN,
+        )
+
+    def test_employee_can_read_departments(self):
+        self.client.force_authenticate(user=self.employee1)
+
+        response = self.client.get(self.department_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_hr_can_create_department(self):
+        self.client.force_authenticate(user=self.hr)
+
+        response = self.client.post(
+            self.department_url,
+            {"name": "Finance"},
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_201_CREATED,
+        )
+
+    def test_employee_cannot_change_department_or_status(self):
+        self.client.force_authenticate(user=self.employee1)
+
+        response = self.client.patch(
+            self.profile1_url,
+            {
+                "department_id": self.department.pk,
+                "status": "INACTIVE",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+        self.profile1.refresh_from_db()
+
+        self.assertEqual(
+            self.profile1.status,
+            EmployeeProfile.Status.ACTIVE,
+        )
+
+    def test_invalid_user_reference_is_rejected(self):
+        self.client.force_authenticate(user=self.admin)
+
+        response = self.client.post(
+            self.profile_list_url,
+            {
+                "user_id": 999999,
+                "department_id": self.department.pk,
+                "job_title": "Intern",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+        )
+
+    def test_inactive_department_is_rejected(self):
+        self.client.force_authenticate(user=self.admin)
+
+        inactive_department = Department.objects.create(
+            name="Inactive Department",
+            is_active=False,
+        )
+
+        new_user = self.create_user("inactiveuser", "EMPLOYEE")
+
+        response = self.client.post(
+            self.profile_list_url,
+            {
+                "user_id": new_user.pk,
+                "department_id": inactive_department.pk,
+                "job_title": "Intern",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
         )

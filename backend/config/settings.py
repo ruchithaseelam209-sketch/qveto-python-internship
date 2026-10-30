@@ -56,6 +56,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
+# PostgreSQL Database Configuration
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -68,8 +69,10 @@ DATABASES = {
     }
 }
 
+# Custom User Model
 AUTH_USER_MODEL = "accounts.User"
 
+# Password Validation
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": (
@@ -92,18 +95,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": (
             "django.contrib.auth.password_validation."
-            "CommonPasswordValidator"
-        ),
-    },
-    {
-        "NAME": (
-            "django.contrib.auth.password_validation."
             "NumericPasswordValidator"
         ),
     },
 ]
 
 LANGUAGE_CODE = "en-us"
+
 TIME_ZONE = "Asia/Kolkata"
 
 USE_I18N = True
@@ -113,6 +111,7 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# CORS Configuration
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -120,6 +119,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
+# Django REST Framework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",

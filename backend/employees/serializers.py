@@ -76,6 +76,7 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
                 "email",
                 "department_id",
                 "department_name",
+                "job_title",
                 "status",
                 "id",
                 "created_at",

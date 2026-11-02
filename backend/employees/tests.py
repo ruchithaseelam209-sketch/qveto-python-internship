@@ -252,7 +252,15 @@ class EmployeeAPIPermissionTests(APITestCase):
             EmployeeProfile.objects.filter(pk=self.profile1.pk).exists()
         )
 
-    def test_employee_can_update_own_profile(self):
+    def test_employee_cannot_update_own_job_title(self):
+        """Employees must not be able to change their own job title.
+
+        job_title is an administrative field controlled only by Admin or HR.
+        A PATCH request from an employee with job_title in the payload must
+        be rejected with HTTP 400, and the original value must be preserved.
+        """
+        original_job_title = self.profile1.job_title
+
         self.client.force_authenticate(user=self.employee1)
 
         response = self.client.patch(
@@ -261,13 +269,13 @@ class EmployeeAPIPermissionTests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
         self.profile1.refresh_from_db()
 
         self.assertEqual(
             self.profile1.job_title,
-            "Senior Developer",
+            original_job_title,
         )
 
     def test_admin_can_update_employee_profile(self):

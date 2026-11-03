@@ -1,7 +1,9 @@
-import json
-
-from django.contrib.auth import authenticate
-from django.contrib.auth import get_user_model
+from django.contrib.auth import (
+    authenticate,
+    get_user_model,
+    login as django_login,
+    logout as django_logout,
+)
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError
 
@@ -14,14 +16,11 @@ from rest_framework.response import Response
 User = get_user_model()
 
 
+# USER REGISTRATION
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def register(request):
-    """
-    Register a new employee account.
-    Public registration cannot create Admin or HR accounts.
-    """
 
     username = request.data.get("username", "").strip()
     email = request.data.get("email", "").strip().lower()
@@ -31,17 +30,13 @@ def register(request):
 
     if not username or not email or not password:
         return Response(
-            {
-                "error": "Username, email, and password are required."
-            },
+            {"error": "Username, email, and password are required."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     if len(password) < 8:
         return Response(
-            {
-                "error": "Password must contain at least 8 characters."
-            },
+            {"error": "Password must contain at least 8 characters."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -66,6 +61,7 @@ def register(request):
             last_name=last_name,
             role=User.Role.EMPLOYEE,
         )
+
     except IntegrityError:
         return Response(
             {"error": "Unable to create this account."},
@@ -86,13 +82,11 @@ def register(request):
     )
 
 
+# USER LOGIN
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login(request):
-    """
-    Authenticate a user with username and password.
-    """
 
     username = request.data.get("username", "").strip()
     password = request.data.get("password", "")
@@ -121,6 +115,9 @@ def login(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    # Create authenticated Django session
+    django_login(request, user)
+
     return Response(
         {
             "message": "Login successful.",
@@ -132,5 +129,17 @@ def login(request):
                 "is_superuser": user.is_superuser,
             },
         },
+        status=status.HTTP_200_OK,
+    )
+
+
+# USER LOGOUT
+@api_view(["POST"])
+def logout(request):
+
+    django_logout(request)
+
+    return Response(
+        {"message": "Logout successful."},
         status=status.HTTP_200_OK,
     )

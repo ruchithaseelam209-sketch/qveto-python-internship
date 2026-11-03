@@ -1,12 +1,17 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
+from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
+from rest_framework.test import APIRequestFactory, APITestCase
+
+from accounts.permissions import IsAdmin, IsHR, IsEmployee
 
 User = get_user_model()
 
 
 class AuthenticationTests(APITestCase):
+    """Tests for authentication and registration APIs."""
 
     def test_register_employee(self):
         """Test successful employee registration."""
@@ -116,6 +121,23 @@ class AuthenticationTests(APITestCase):
             response.data,
         )
 
+    def test_registration_without_username(self):
+        """Test registration without a username."""
+        response = self.client.post(
+            reverse("accounts:register"),
+            {
+                "email": "nousername@example.com",
+                "password": "SecurePass123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_400_BAD_REQUEST,
+            response.data,
+        )
+
     def test_login_without_password(self):
         """Test login without a password."""
         response = self.client.post(
@@ -199,3 +221,63 @@ class AuthenticationTests(APITestCase):
 
         user = User.objects.get(username="publicadmin")
         self.assertEqual(user.role, User.Role.EMPLOYEE)
+
+
+class RolePermissionTests(TestCase):
+    """Tests for role-based permission classes."""
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+    def check_permission(self, permission_class, user):
+        request = self.factory.get("/")
+        request.user = user
+        permission = permission_class()
+        return permission.has_permission(request, None)
+
+    def test_admin_permissions(self):
+        """Test permissions granted to Admin users."""
+        admin = User.objects.create_user(
+            username="permission_admin",
+            password="SecurePass123!",
+            role="ADMIN",
+        )
+
+        self.assertTrue(self.check_permission(IsAdmin, admin))
+        self.assertTrue(self.check_permission(IsHR, admin))
+        self.assertFalse(self.check_permission(IsEmployee, admin))
+
+    def test_hr_permissions(self):
+        """Test permissions granted to HR users."""
+        hr = User.objects.create_user(
+            username="permission_hr",
+            password="SecurePass123!",
+            role="HR",
+        )
+
+        self.assertFalse(self.check_permission(IsAdmin, hr))
+        self.assertTrue(self.check_permission(IsHR, hr))
+        self.assertFalse(self.check_permission(IsEmployee, hr))
+
+    def test_employee_permissions(self):
+        """Test permissions granted to Employee users."""
+        employee = User.objects.create_user(
+            username="permission_employee",
+            password="SecurePass123!",
+            role="EMPLOYEE",
+        )
+
+        self.assertFalse(self.check_permission(IsAdmin, employee))
+        self.assertFalse(self.check_permission(IsHR, employee))
+        self.assertTrue(self.check_permission(IsEmployee, employee))
+
+    def test_anonymous_user_permissions(self):
+        """Test that anonymous users have no role-based permissions."""
+        request = self.factory.get("/")
+        request.user = AnonymousUser()
+
+        for permission_class in (IsAdmin, IsHR, IsEmployee):
+            with self.subTest(permission=permission_class.__name__):
+                self.assertFalse(
+                    permission_class().has_permission(request, None)
+                )

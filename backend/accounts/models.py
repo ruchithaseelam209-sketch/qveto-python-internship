@@ -15,20 +15,9 @@ class User(AbstractUser):
         default=Role.EMPLOYEE,
     )
 
-    phone_number = models.CharField(
-        max_length=15,
-        blank=True,
-    )
-
-    department = models.CharField(
-        max_length=100,
-        blank=True,
-    )
-
-    designation = models.CharField(
-        max_length=100,
-        blank=True,
-    )
+    phone_number = models.CharField(max_length=15, blank=True)
+    department = models.CharField(max_length=100, blank=True)
+    designation = models.CharField(max_length=100, blank=True)
 
     employee_id = models.CharField(
         max_length=20,
@@ -37,10 +26,7 @@ class User(AbstractUser):
         blank=True,
     )
 
-    date_of_joining = models.DateField(
-        null=True,
-        blank=True,
-    )
+    date_of_joining = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.username} ({self.role})"

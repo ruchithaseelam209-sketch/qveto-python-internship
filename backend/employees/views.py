@@ -65,6 +65,20 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
 
         serializer.save()
 
+    def perform_update(self, serializer):
+        user = self.request.user
+
+        if is_admin_or_hr(user):
+            serializer.save()
+            return
+
+        if serializer.instance.user_id != user.id:
+            raise PermissionDenied(
+                "You can only update your own employee profile."
+            )
+
+        serializer.save()
+
 
 # ATTENDANCE MANAGEMENT
 class AttendanceViewSet(viewsets.ModelViewSet):
@@ -105,14 +119,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 "Your account does not have an employee profile."
             )
 
-    @action(
-        detail=False,
-        methods=["post"],
-        url_path="check-in",
-    )
+    @action(detail=False, methods=["post"], url_path="check-in")
     def check_in(self, request):
         employee = self.get_employee()
-
         now = timezone.now()
         today = timezone.localdate()
 
@@ -133,13 +142,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
             attendance.check_in = now
             attendance.status = Attendance.Status.PRESENT
-
             attendance.save(
-                update_fields=[
-                    "check_in",
-                    "status",
-                    "updated_at",
-                ]
+                update_fields=["check_in", "status", "updated_at"]
             )
 
         return Response(
@@ -151,11 +155,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             ),
         )
 
-    @action(
-        detail=False,
-        methods=["post"],
-        url_path="check-out",
-    )
+    @action(detail=False, methods=["post"], url_path="check-out")
     def check_out(self, request):
         employee = self.get_employee()
 
@@ -180,17 +180,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             )
 
         attendance.check_out = timezone.now()
-
         attendance.save(
-            update_fields=[
-                "check_out",
-                "updated_at",
-            ]
+            update_fields=["check_out", "updated_at"]
         )
 
-        return Response(
-            AttendanceSerializer(attendance).data
-        )
+        return Response(AttendanceSerializer(attendance).data)
 
 
 # LEAVE TYPE MANAGEMENT
@@ -218,9 +212,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         if is_admin_or_hr(user):
             return queryset
 
-        return queryset.filter(
-            employee__user=user
-        )
+        return queryset.filter(employee__user=user)
 
     def get_permissions(self):
         if self.action in [
@@ -230,10 +222,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
             "partial_update",
             "destroy",
         ]:
-            return [
-                IsAuthenticated(),
-                IsHR(),
-            ]
+            return [IsAuthenticated(), IsHR()]
 
         return [IsAuthenticated()]
 
@@ -249,68 +238,40 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
 
         serializer.save(employee=employee)
 
-    @action(
-        detail=True,
-        methods=["post"],
-        url_path="approve",
-    )
+    @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
         leave_request = self.get_object()
 
         if leave_request.status != LeaveRequest.Status.PENDING:
             raise ValidationError(
-                {
-                    "detail": (
-                        "Only pending leave requests "
-                        "can be approved."
-                    )
-                }
+                {"detail": "Only pending leave requests can be approved."}
             )
 
         leave_request.status = LeaveRequest.Status.APPROVED
         leave_request.reviewed_by = request.user
         leave_request.reviewed_at = timezone.now()
-
         leave_request.review_remarks = request.data.get(
-            "review_remarks",
-            "",
+            "review_remarks", ""
         )
-
         leave_request.save()
 
-        return Response(
-            LeaveRequestSerializer(leave_request).data
-        )
+        return Response(LeaveRequestSerializer(leave_request).data)
 
-    @action(
-        detail=True,
-        methods=["post"],
-        url_path="reject",
-    )
+    @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
         leave_request = self.get_object()
 
         if leave_request.status != LeaveRequest.Status.PENDING:
             raise ValidationError(
-                {
-                    "detail": (
-                        "Only pending leave requests "
-                        "can be rejected."
-                    )
-                }
+                {"detail": "Only pending leave requests can be rejected."}
             )
 
         leave_request.status = LeaveRequest.Status.REJECTED
         leave_request.reviewed_by = request.user
         leave_request.reviewed_at = timezone.now()
-
         leave_request.review_remarks = request.data.get(
-            "review_remarks",
-            "",
+            "review_remarks", ""
         )
-
         leave_request.save()
 
-        return Response(
-            LeaveRequestSerializer(leave_request).data
-        )
+        return Response(LeaveRequestSerializer(leave_request).data)

@@ -1,3 +1,5 @@
+
+from django.db.models import Q
 from django.utils import timezone
 
 from rest_framework import status, viewsets
@@ -52,10 +54,36 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         user = self.request.user
 
-        if is_admin_or_hr(user):
-            return queryset
+        # Employees can only view their own profile
+        if not is_admin_or_hr(user):
+            return queryset.filter(user=user)
 
-        return queryset.filter(user=user)
+        # Search by username, name, email, or job title
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(
+                Q(user__username__icontains=search)
+                | Q(user__first_name__icontains=search)
+                | Q(user__last_name__icontains=search)
+                | Q(user__email__icontains=search)
+                | Q(job_title__icontains=search)
+            )
+
+        # Filter by department name
+        department = self.request.query_params.get("department")
+        if department:
+            queryset = queryset.filter(
+                department__name__icontains=department
+            )
+
+        # Filter by employee status
+        employee_status = self.request.query_params.get("status")
+        if employee_status:
+            queryset = queryset.filter(
+                status__iexact=employee_status
+            )
+
+        return queryset
 
     def perform_create(self, serializer):
         if not is_admin_or_hr(self.request.user):

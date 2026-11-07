@@ -1,4 +1,3 @@
-
 from django.db.models import Q
 from django.utils import timezone
 
@@ -6,6 +5,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from accounts.permissions import IsHR
@@ -33,6 +33,13 @@ from .employee_permissions import (
 )
 
 
+# EMPLOYEE API PAGINATION
+class EmployeePagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 # DEPARTMENT MANAGEMENT
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
@@ -49,6 +56,7 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
 
     serializer_class = EmployeeProfileSerializer
     permission_classes = [EmployeeProfilePermission]
+    pagination_class = EmployeePagination
 
     def get_queryset(self):
         queryset = super().get_queryset()

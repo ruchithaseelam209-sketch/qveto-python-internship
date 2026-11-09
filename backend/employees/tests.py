@@ -1,3 +1,4 @@
+
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
@@ -157,7 +158,7 @@ class EmployeeAPIPermissionTests(APITestCase):
         response = self.client.get(self.profile_list_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data["results"]), 2)
 
     def test_hr_can_list_all_employee_profiles(self):
         self.client.force_authenticate(user=self.hr)
@@ -165,7 +166,7 @@ class EmployeeAPIPermissionTests(APITestCase):
         response = self.client.get(self.profile_list_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data["results"]), 2)
 
     def test_superuser_can_access_all_profiles(self):
         superuser = User.objects.create_superuser(
@@ -179,7 +180,7 @@ class EmployeeAPIPermissionTests(APITestCase):
         response = self.client.get(self.profile_list_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data["results"]), 2)
 
     def test_employee_can_only_list_own_profile(self):
         self.client.force_authenticate(user=self.employee1)
@@ -187,8 +188,11 @@ class EmployeeAPIPermissionTests(APITestCase):
         response = self.client.get(self.profile_list_url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["id"], self.profile1.pk)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(
+            response.data["results"][0]["id"],
+            self.profile1.pk,
+        )
 
     def test_employee_cannot_access_another_employees_profile(self):
         self.client.force_authenticate(user=self.employee1)

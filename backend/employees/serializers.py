@@ -145,6 +145,8 @@ class EmployeeProfileSerializer(serializers.ModelSerializer):
 # ATTENDANCE SERIALIZER
 class AttendanceSerializer(serializers.ModelSerializer):
 
+    working_hours = serializers.SerializerMethodField()
+
     class Meta:
         model = Attendance
         fields = "__all__"
@@ -152,7 +154,38 @@ class AttendanceSerializer(serializers.ModelSerializer):
             "id",
             "created_at",
             "updated_at",
+            "working_hours",
         )
+
+    def get_working_hours(self, obj):
+        if obj.check_in and obj.check_out:
+            duration = obj.check_out - obj.check_in
+            total_seconds = int(duration.total_seconds())
+
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+
+            return f"{hours} hours {minutes} minutes"
+
+        return None
+
+    def validate(self, attrs):
+        check_in = attrs.get(
+            "check_in",
+            self.instance.check_in if self.instance else None
+        )
+
+        check_out = attrs.get(
+            "check_out",
+            self.instance.check_out if self.instance else None
+        )
+
+        if check_in and check_out and check_out < check_in:
+            raise serializers.ValidationError({
+                "check_out": "Check-out cannot be earlier than check-in."
+            })
+
+        return attrs
 
 
 # LEAVE TYPE SERIALIZER

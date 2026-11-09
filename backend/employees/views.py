@@ -1,4 +1,8 @@
+
 from django.utils import timezone
+from django.utils.dateparse import parse_date
+
+from django.db.models import Count, Q
 
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -79,10 +83,70 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             "employee__user",
         )
 
-        if is_admin_or_hr(user):
-            return queryset
+        # Employees can access only their own records
+        if not is_admin_or_hr(user):
+            queryset = queryset.filter(employee__user=user)
 
-        return queryset.filter(employee__user=user)
+        # Date-wise filtering
+        start_date = self.request.query_params.get("start_date")
+        end_date = self.request.query_params.get("end_date")
+
+        if start_date:
+            start_date = parse_date(start_date)
+
+            if not start_date:
+                raise ValidationError({
+                    "start_date": (
+                        "Enter a valid date in YYYY-MM-DD format."
+                    )
+                })
+
+            queryset = queryset.filter(date__gte=start_date)
+
+        if end_date:
+            end_date = parse_date(end_date)
+
+            if not end_date:
+                raise ValidationError({
+                    "end_date": (
+                        "Enter a valid date in YYYY-MM-DD format."
+                    )
+                })
+
+            queryset = queryset.filter(date__lte=end_date)
+
+        if start_date and end_date and start_date > end_date:
+            raise ValidationError({
+                "detail": (
+                    "Start date cannot be later than end date."
+                )
+            })
+
+        # Employee filtering (HR/Admin only)
+        employee_id = self.request.query_params.get("employee_id")
+
+        if employee_id:
+            if not is_admin_or_hr(user):
+                raise PermissionDenied(
+                    "Only HR or Admin can filter by employee."
+                )
+
+            try:
+                employee_id = int(employee_id)
+
+                if employee_id <= 0:
+                    raise ValueError
+
+            except ValueError:
+                raise ValidationError({
+                    "employee_id": "Enter a valid employee ID."
+                })
+
+            queryset = queryset.filter(
+                employee_id=employee_id
+            )
+
+        return queryset
 
     def get_permissions(self):
         if self.action in [
@@ -91,6 +155,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             "partial_update",
             "destroy",
         ]:
+            return [IsAuthenticated(), IsHR()]
+
+        if self.action == "report":
             return [IsAuthenticated(), IsHR()]
 
         return [IsAuthenticated()]
@@ -105,6 +172,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 "Your account does not have an employee profile."
             )
 
+    # EMPLOYEE CHECK-IN
     @action(
         detail=False,
         methods=["post"],
@@ -151,6 +219,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             ),
         )
 
+    # EMPLOYEE CHECK-OUT
     @action(
         detail=False,
         methods=["post"],
@@ -190,6 +259,80 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
         return Response(
             AttendanceSerializer(attendance).data
+        )
+
+    # MONTHLY ATTENDANCE SUMMARY
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="monthly-summary",
+    )
+    def monthly_summary(self, request):
+        today = timezone.localdate()
+
+        year = request.query_params.get("year", today.year)
+        month = request.query_params.get("month", today.month)
+
+        try:
+            year = int(year)
+            month = int(month)
+
+            if year < 2000 or year > 9999:
+                raise ValueError
+
+            if month < 1 or month > 12:
+                raise ValueError
+
+        except (TypeError, ValueError):
+            raise ValidationError({
+                "detail": "Provide a valid year and month."
+            })
+
+        queryset = self.get_queryset().filter(
+            date__year=year,
+            date__month=month,
+        )
+
+        summary = queryset.aggregate(
+            total_days=Count("id"),
+            present=Count(
+                "id",
+                filter=Q(status=Attendance.Status.PRESENT),
+            ),
+            absent=Count(
+                "id",
+                filter=Q(status=Attendance.Status.ABSENT),
+            ),
+            half_day=Count(
+                "id",
+                filter=Q(status=Attendance.Status.HALF_DAY),
+            ),
+            on_leave=Count(
+                "id",
+                filter=Q(status=Attendance.Status.ON_LEAVE),
+            ),
+        )
+
+        return Response({
+            "year": year,
+            "month": month,
+            **summary,
+        })
+
+    # HR ATTENDANCE REPORT
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="report",
+    )
+    def report(self, request):
+        queryset = self.get_queryset()
+
+        return Response(
+            AttendanceSerializer(
+                queryset,
+                many=True,
+            ).data
         )
 
 
@@ -258,14 +401,11 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         leave_request = self.get_object()
 
         if leave_request.status != LeaveRequest.Status.PENDING:
-            raise ValidationError(
-                {
-                    "detail": (
-                        "Only pending leave requests "
-                        "can be approved."
-                    )
-                }
-            )
+            raise ValidationError({
+                "detail": (
+                    "Only pending leave requests can be approved."
+                )
+            })
 
         leave_request.status = LeaveRequest.Status.APPROVED
         leave_request.reviewed_by = request.user
@@ -291,14 +431,11 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         leave_request = self.get_object()
 
         if leave_request.status != LeaveRequest.Status.PENDING:
-            raise ValidationError(
-                {
-                    "detail": (
-                        "Only pending leave requests "
-                        "can be rejected."
-                    )
-                }
-            )
+            raise ValidationError({
+                "detail": (
+                    "Only pending leave requests can be rejected."
+                )
+            })
 
         leave_request.status = LeaveRequest.Status.REJECTED
         leave_request.reviewed_by = request.user

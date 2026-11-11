@@ -1,10 +1,13 @@
 from django.urls import path
-from .views import login, register, logout
+
+from . import views
+from .csrf_views import csrf_token
 
 app_name = "accounts"
 
 urlpatterns = [
-    path("register/", register, name="register"),
-    path("login/", login, name="login"),
-    path("logout/", logout, name="logout"),
+    path("csrf/", csrf_token, name="csrf_token"),
+    path("register/", views.register, name="register"),
+    path("login/", views.login, name="login"),
+    path("logout/", views.logout, name="logout"),
 ]

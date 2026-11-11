@@ -20,6 +20,7 @@ from .models import (
 
 from .serializers import (
     DepartmentSerializer,
+    EmployeeCreateSerializer,
     EmployeeProfileSerializer,
     AttendanceSerializer,
     LeaveTypeSerializer,
@@ -49,6 +50,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 
 # EMPLOYEE PROFILE MANAGEMENT
 class EmployeeProfileViewSet(viewsets.ModelViewSet):
+
     queryset = EmployeeProfile.objects.select_related(
         "user",
         "department",
@@ -58,6 +60,12 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
     permission_classes = [EmployeeProfilePermission]
     pagination_class = EmployeePagination
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return EmployeeCreateSerializer
+
+        return EmployeeProfileSerializer
+
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
@@ -66,8 +74,9 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
         if not is_admin_or_hr(user):
             return queryset.filter(user=user)
 
-        # Search by username, name, email, or job title
+        # Search employees
         search = self.request.query_params.get("search")
+
         if search:
             queryset = queryset.filter(
                 Q(user__username__icontains=search)
@@ -75,10 +84,12 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
                 | Q(user__last_name__icontains=search)
                 | Q(user__email__icontains=search)
                 | Q(job_title__icontains=search)
+                | Q(user__employee_id__icontains=search)
             )
 
-        # Filter by department name
+        # Filter by department
         department = self.request.query_params.get("department")
+
         if department:
             queryset = queryset.filter(
                 department__name__icontains=department
@@ -86,6 +97,7 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
 
         # Filter by employee status
         employee_status = self.request.query_params.get("status")
+
         if employee_status:
             queryset = queryset.filter(
                 status__iexact=employee_status
@@ -96,7 +108,7 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         if not is_admin_or_hr(self.request.user):
             raise PermissionDenied(
-                "Only Admin and HR can create employee profiles."
+                "Only Admin and HR can create employees."
             )
 
         serializer.save()
@@ -118,6 +130,7 @@ class EmployeeProfileViewSet(viewsets.ModelViewSet):
 
 # ATTENDANCE MANAGEMENT
 class AttendanceViewSet(viewsets.ModelViewSet):
+
     serializer_class = AttendanceSerializer
     permission_classes = [IsAuthenticated]
 
@@ -150,6 +163,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return EmployeeProfile.objects.get(
                 user=self.request.user
             )
+
         except EmployeeProfile.DoesNotExist:
             raise PermissionDenied(
                 "Your account does not have an employee profile."
@@ -157,6 +171,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="check-in")
     def check_in(self, request):
+
         employee = self.get_employee()
         now = timezone.now()
         today = timezone.localdate()
@@ -171,6 +186,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         )
 
         if not created:
+
             if attendance.check_in:
                 raise ValidationError(
                     {"detail": "You have already checked in today."}
@@ -178,8 +194,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
             attendance.check_in = now
             attendance.status = Attendance.Status.PRESENT
+
             attendance.save(
-                update_fields=["check_in", "status", "updated_at"]
+                update_fields=[
+                    "check_in",
+                    "status",
+                    "updated_at",
+                ]
             )
 
         return Response(
@@ -193,6 +214,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="check-out")
     def check_out(self, request):
+
         employee = self.get_employee()
 
         try:
@@ -200,6 +222,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 employee=employee,
                 date=timezone.localdate(),
             )
+
         except Attendance.DoesNotExist:
             raise ValidationError(
                 {"detail": "Check in before checking out."}
@@ -216,15 +239,22 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             )
 
         attendance.check_out = timezone.now()
+
         attendance.save(
-            update_fields=["check_out", "updated_at"]
+            update_fields=[
+                "check_out",
+                "updated_at",
+            ]
         )
 
-        return Response(AttendanceSerializer(attendance).data)
+        return Response(
+            AttendanceSerializer(attendance).data
+        )
 
 
 # LEAVE TYPE MANAGEMENT
 class LeaveTypeViewSet(viewsets.ModelViewSet):
+
     queryset = LeaveType.objects.all()
     serializer_class = LeaveTypeSerializer
     permission_classes = [IsAuthenticated, IsHR]
@@ -232,6 +262,7 @@ class LeaveTypeViewSet(viewsets.ModelViewSet):
 
 # LEAVE REQUEST MANAGEMENT
 class LeaveRequestViewSet(viewsets.ModelViewSet):
+
     serializer_class = LeaveRequestSerializer
     permission_classes = [IsAuthenticated]
 
@@ -263,10 +294,12 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def perform_create(self, serializer):
+
         try:
             employee = EmployeeProfile.objects.get(
                 user=self.request.user
             )
+
         except EmployeeProfile.DoesNotExist:
             raise PermissionDenied(
                 "Your account does not have an employee profile."
@@ -276,6 +309,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):
+
         leave_request = self.get_object()
 
         if leave_request.status != LeaveRequest.Status.PENDING:
@@ -286,15 +320,21 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         leave_request.status = LeaveRequest.Status.APPROVED
         leave_request.reviewed_by = request.user
         leave_request.reviewed_at = timezone.now()
+
         leave_request.review_remarks = request.data.get(
-            "review_remarks", ""
+            "review_remarks",
+            "",
         )
+
         leave_request.save()
 
-        return Response(LeaveRequestSerializer(leave_request).data)
+        return Response(
+            LeaveRequestSerializer(leave_request).data
+        )
 
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):
+
         leave_request = self.get_object()
 
         if leave_request.status != LeaveRequest.Status.PENDING:
@@ -305,9 +345,14 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         leave_request.status = LeaveRequest.Status.REJECTED
         leave_request.reviewed_by = request.user
         leave_request.reviewed_at = timezone.now()
+
         leave_request.review_remarks = request.data.get(
-            "review_remarks", ""
+            "review_remarks",
+            "",
         )
+
         leave_request.save()
 
-        return Response(LeaveRequestSerializer(leave_request).data)
+        return Response(
+            LeaveRequestSerializer(leave_request).data
+        )

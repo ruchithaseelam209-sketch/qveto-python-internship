@@ -1,34 +1,70 @@
 import os
 from pathlib import Path
 
+
+# =========================================================
+# BASE DIRECTORY
+# =========================================================
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# =========================================================
+# LOAD ROOT .ENV FILE
+# =========================================================
+
 ENV_FILE = BASE_DIR.parent / ".env"
 
 if ENV_FILE.exists():
-    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, value = line.split("=", 1)
-            os.environ.setdefault(
-                key.strip(),
-                value.strip().strip('"').strip("'")
-            )
+    with open(ENV_FILE, "r", encoding="utf-8") as file:
+        for line in file:
+            line = line.strip()
+
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+
+                os.environ.setdefault(key, value)
+
+
+# =========================================================
+# ENVIRONMENT HELPER
+# =========================================================
+
+def get_bool(name, default=False):
+    return os.environ.get(name, str(default)).lower() == "true"
+
+
+def get_list(name, default):
+    value = os.environ.get(name)
+
+    if value:
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    return default
+
+
+# =========================================================
+# SECURITY SETTINGS
+# =========================================================
 
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY",
     "django-insecure-local-development-only-key"
 )
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
+DEBUG = get_bool("DJANGO_DEBUG", True)
 
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.environ.get(
-        "DJANGO_ALLOWED_HOSTS",
-        "localhost,127.0.0.1,[::1]"
-    ).split(",")
-    if host.strip()
-]
+ALLOWED_HOSTS = get_list(
+    "DJANGO_ALLOWED_HOSTS",
+    ["localhost", "127.0.0.1", "testserver"]
+)
+
+
+# =========================================================
+# INSTALLED APPLICATIONS
+# =========================================================
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -37,14 +73,22 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+
     "rest_framework",
     "corsheaders",
+
     "accounts",
     "employees",
 ]
 
+
+# =========================================================
+# MIDDLEWARE
+# =========================================================
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -54,7 +98,17 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+
+# =========================================================
+# URL CONFIGURATION
+# =========================================================
+
 ROOT_URLCONF = "config.urls"
+
+
+# =========================================================
+# TEMPLATES
+# =========================================================
 
 TEMPLATES = [
     {
@@ -71,8 +125,19 @@ TEMPLATES = [
     },
 ]
 
+
+# =========================================================
+# WSGI / ASGI
+# =========================================================
+
 WSGI_APPLICATION = "config.wsgi.application"
+
 ASGI_APPLICATION = "config.asgi.application"
+
+
+# =========================================================
+# DATABASE - POSTGRESQL
+# =========================================================
 
 DATABASES = {
     "default": {
@@ -86,7 +151,17 @@ DATABASES = {
     }
 }
 
+
+# =========================================================
+# CUSTOM USER MODEL
+# =========================================================
+
 AUTH_USER_MODEL = "accounts.User"
+
+
+# =========================================================
+# PASSWORD VALIDATION
+# =========================================================
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -103,65 +178,136 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+
+# =========================================================
+# INTERNATIONALIZATION
+# =========================================================
+
 LANGUAGE_CODE = "en-us"
+
 TIME_ZONE = "Asia/Kolkata"
+
 USE_I18N = True
+
 USE_TZ = True
 
-STATIC_URL = "static/"
+
+# =========================================================
+# STATIC FILES - RENDER FIX
+# =========================================================
+
+STATIC_URL = "/static/"
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+
+# =========================================================
+# DEFAULT PRIMARY KEY
+# =========================================================
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-]
+
+# =========================================================
+# CORS CONFIGURATION
+# =========================================================
+
+CORS_ALLOWED_ORIGINS = get_list(
+    "CORS_ALLOWED_ORIGINS",
+    [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ]
+)
 
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
-]
+
+# =========================================================
+# CSRF CONFIGURATION
+# =========================================================
+
+CSRF_TRUSTED_ORIGINS = get_list(
+    "CSRF_TRUSTED_ORIGINS",
+    [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
+    ]
+)
+
+
+# =========================================================
+# DJANGO REST FRAMEWORK
+# =========================================================
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.BasicAuthentication",
     ],
+
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
 }
 
-SECURE_SSL_REDIRECT = (
-    os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "False").lower() == "true"
+
+# =========================================================
+# EMAIL CONFIGURATION
+# =========================================================
+
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+
+# =========================================================
+# PRODUCTION SECURITY
+# =========================================================
+
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
 )
 
-SESSION_COOKIE_SECURE = (
-    os.environ.get("DJANGO_SESSION_COOKIE_SECURE", "False").lower() == "true"
+SECURE_SSL_REDIRECT = get_bool(
+    "DJANGO_SECURE_SSL_REDIRECT",
+    not DEBUG
 )
 
-CSRF_COOKIE_SECURE = (
-    os.environ.get("DJANGO_CSRF_COOKIE_SECURE", "False").lower() == "true"
+SESSION_COOKIE_SECURE = get_bool(
+    "DJANGO_SESSION_COOKIE_SECURE",
+    not DEBUG
 )
+
+CSRF_COOKIE_SECURE = get_bool(
+    "DJANGO_CSRF_COOKIE_SECURE",
+    not DEBUG
+)
+
+SESSION_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
+
+CSRF_COOKIE_SAMESITE = "None" if not DEBUG else "Lax"
 
 SECURE_HSTS_SECONDS = int(
     os.environ.get("DJANGO_SECURE_HSTS_SECONDS", "0")
 )
 
-SECURE_HSTS_INCLUDE_SUBDOMAINS = (
-    os.environ.get("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", "False").lower()
-    == "true"
+SECURE_HSTS_INCLUDE_SUBDOMAINS = get_bool(
+    "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    False
 )
 
-SECURE_HSTS_PRELOAD = (
-    os.environ.get("DJANGO_SECURE_HSTS_PRELOAD", "False").lower() == "true"
+SECURE_HSTS_PRELOAD = get_bool(
+    "DJANGO_SECURE_HSTS_PRELOAD",
+    False
 )

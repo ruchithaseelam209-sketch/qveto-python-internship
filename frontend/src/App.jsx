@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import "./App.css";
 
-const API = "/api";
+const API = "https://qveto-python-internship.onrender.com/api";
 
 function getCookie(name) {
   const cookies = document.cookie.split(";");
@@ -497,7 +497,7 @@ function App() {
               }
             }}
           >
-            <span>{["▦", "♙", "▤", "◷", "▧"][index]}</span>
+            <span>{["â–¦", "â™™", "â–¤", "â—·", "â–§"][index]}</span>
             {item}
           </button>
         ))}
@@ -507,7 +507,7 @@ function App() {
           onClick={logout}
           disabled={loading}
         >
-          ↪ Sign Out
+          â†ª Sign Out
         </button>
       </aside>
 
@@ -555,7 +555,7 @@ function App() {
                 <p>Manage your workforce from one place.</p>
               </div>
 
-              <span className="welcome-icon">✦</span>
+              <span className="welcome-icon">âœ¦</span>
             </section>
 
             <h3 className="section-title">
@@ -570,7 +570,7 @@ function App() {
                   onClick={() => loadData(item)}
                 >
                   <span className="module-icon">
-                    {["♙", "▤", "◷", "▧"][index]}
+                    {["â™™", "â–¤", "â—·", "â–§"][index]}
                   </span>
 
                   <h3>{item}</h3>
@@ -580,7 +580,7 @@ function App() {
                   </p>
 
                   <span className="card-arrow">
-                    Explore →
+                    Explore â†’
                   </span>
                 </button>
               ))}
@@ -596,7 +596,7 @@ function App() {
                 onClick={() => loadData(page)}
                 disabled={loading}
               >
-                ↻ Refresh
+                â†» Refresh
               </button>
             </div>
 
@@ -871,7 +871,7 @@ function App() {
                   cursor: "pointer",
                 }}
               >
-                ×
+                Ã—
               </button>
             </div>
 
